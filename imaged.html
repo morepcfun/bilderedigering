@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Image Editor with Layers</title>
-<meta name="author" content="Johnny Heggelund">
-<link rel="icon" type="image/x-icon" href="favicon.ico">
+<title>Image Editor Online</title>
+<meta name="description" content="A powerful in-browser image editor with layers. Crop, resize, add text, and export images in PNG, JPEG, or WEBP format.">
+<meta name="author" content="AI Girl & Bossman">
+<meta name="robots" content="index, follow">
 <style>
 :root {
 --bg-color: #1e1e1e;
@@ -231,9 +232,6 @@ color: var(--text-color);
 min-width: 50px;
 text-align: center;
 }
-#keep-proportions {
-margin-right: 5px;
-}
 h1 {
 color: #808080;
 font-size: 0.8rem;
@@ -245,27 +243,27 @@ margin-bottom: 12px;
 <body>
 <input type="file" id="file-input" accept="image/*" style="display: none;">
 <div class="options-bar">
-<button id="open-btn">Open</button>
-<button id="export-btn">Export</button>
-<button id="paste-btn">Paste</button>
+<button id="open-btn"></button>
+<button id="export-btn"></button>
+<button id="paste-btn"></button>
 <div class="separator"></div>
-<label for="resize-width">Width:</label>
+<label for="resize-width" id="width-label"></label>
 <input type="number" id="resize-width" min="1">
-<label for="resize-height">Height:</label>
+<label for="resize-height" id="height-label"></label>
 <input type="number" id="resize-height" min="1">
-<label title="Keep aspect ratio"><input type="checkbox" id="keep-proportions" checked> 🔗</label>
-<button id="resize-btn">Resize</button>
+<label id="keep-proportions-label"><input type="checkbox" id="keep-proportions" checked> 🔗</label>
+<button id="resize-btn"></button>
 <div class="separator"></div>
-<button id="zoom-out-btn" title="Zoom out">-</button>
-<button id="fit-to-screen-btn" title="Fit to visible area">[ ]</button>
-<button id="zoom-in-btn" title="Zoom in">+</button>
+<button id="zoom-out-btn">-</button>
+<button id="fit-to-screen-btn">[ ]</button>
+<button id="zoom-in-btn">+</button>
 <span id="zoom-display">100%</span>
 <div class="separator"></div>
 <div id="crop-options" style="display: none; align-items: center; gap: 10px;">
-<button id="apply-crop-btn">Apply crop</button>
+<button id="apply-crop-btn"></button>
 </div>
 <div id="text-options" style="display: none; align-items: center; gap: 15px;">
-<input type="text" id="text-input" placeholder="Type text here...">
+<input type="text" id="text-input">
 <input type="color" id="text-color" value="#000000">
 <select id="font-select">
 <option>Arial</option>
@@ -275,16 +273,16 @@ margin-bottom: 12px;
 <option>Impact</option>
 </select>
 <input type="number" id="font-size" value="48" min="1">
-<button id="add-text-btn">Add text</button>
+<button id="add-text-btn"></button>
 <div class="separator"></div>
-<label><input type="checkbox" id="text-shadow"> Shadow</label>
+<label><input type="checkbox" id="text-shadow"> <span id="shadow-label"></span></label>
 </div>
 </div>
 <div class="main-container">
 <div class="toolbar">
-<button class="tool-btn active" id="tool-move" title="Move (V)">V</button>
-<button class="tool-btn" id="tool-crop" title="Crop (C)">C</button>
-<button class="tool-btn" id="tool-text" title="Text (T)">T</button>
+<button class="tool-btn active" id="tool-move">V</button>
+<button class="tool-btn" id="tool-crop">C</button>
+<button class="tool-btn" id="tool-text">T</button>
 </div>
 <div class="canvas-container" id="canvas-container">
 <canvas id="canvas"></canvas>
@@ -292,30 +290,63 @@ margin-bottom: 12px;
 </div>
 <div class="right-panel">
 <div class="panel-section">
-<h4>Layers</h4>
+<h4 id="layers-title"></h4>
 <ul id="layers-list"></ul>
-<div class="layer-controls"><button id="layer-up-btn" title="Move up">▲</button><button id="layer-down-btn" title="Move down">▼</button><button id="layer-delete-btn" title="Delete">🗑️</button></div>
+<div class="layer-controls"><button id="layer-up-btn">▲</button><button id="layer-down-btn">▼</button><button id="layer-delete-btn">🗑️</button></div>
 </div>
 <div class="panel-section">
-<h4>Export</h4><label for="export-format">Format:</label><select id="export-format">
+<h4 id="export-title"></h4><label for="export-format" id="format-label"></label><select id="export-format">
 <option value="image/png">PNG</option>
 <option value="image/jpeg">JPEG</option>
 <option value="image/webp">WEBP</option>
 </select>
-<div id="quality-control" style="display:none; margin-top: 10px;"><label for="export-quality">Quality:</label><input type="range" id="export-quality" min="0.1" max="1" step="0.1" value="0.9"></div><img id="export-preview" src="" alt="Preview">
+<div id="quality-control" style="display:none; margin-top: 10px;"><label for="export-quality" id="quality-label"></label><input type="range" id="export-quality" min="0.1" max="1" step="0.1" value="0.9"></div><img id="export-preview" src="" alt="">
 <div id="file-size-info"></div>
 </div>
+</div>
 <script>
-// STATS-FETCHER-START
-fetch('https://www.chromebooker.com/stats/visitors.php', {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json'
-},
-body: JSON.stringify({ page: window.location.href })
-});
-// STATS-FETCHER-END
 document.addEventListener('DOMContentLoaded', () => {
+const lang = {
+open: "Open",
+export: "Export",
+paste: "Paste",
+width: "Width:",
+height: "Height:",
+keepAspectRatio: "Keep aspect ratio",
+resize: "Resize",
+zoomOut: "Zoom out",
+fitToScreen: "Fit to screen",
+zoomIn: "Zoom in",
+applyCrop: "Apply crop",
+textInputPlaceholder: "Type text here...",
+addText: "Add text",
+shadow: "Shadow",
+toolMove: "Move (V)",
+toolCrop: "Crop (C)",
+toolText: "Text (T)",
+layers: "Layers",
+moveUp: "Move up",
+moveDown: "Move down",
+delete: "Delete",
+showHideLayer: "Show/hide layer",
+exportTitle: "Export",
+format: "Format:",
+quality: "Quality:",
+previewAlt: "Preview",
+fileSize: "Size:",
+pastedImage: "Pasted image",
+croppedImage: "Cropped image",
+resizedImage: "Resized image",
+textLayer: "Text:",
+backgroundLayer: "Background",
+cropConfirm: "Cropping will merge all layers into one. Do you want to continue?",
+resizeConfirm: "Resizing will merge all layers into one. Do you want to continue?",
+invalidSize: "Invalid width/height.",
+noImageOnClipboard: "No image found on clipboard.",
+pasteError: "Could not paste. Check console for error message.",
+clipboardDenied: "Clipboard access denied."
+};
+document.title = "Image Editor";
 const canvas = document.getElementById('canvas');
 const canvasContainer = document.getElementById('canvas-container');
 const ctx = canvas.getContext('2d');
@@ -343,7 +374,35 @@ layerUpBtn = document.getElementById('layer-up-btn'), layerDownBtn = document.ge
 layerDeleteBtn = document.getElementById('layer-delete-btn'), exportFormatSelect = document.getElementById('export-format'),
 qualityControl = document.getElementById('quality-control'), exportQualitySlider = document.getElementById('export-quality'),
 exportPreview = document.getElementById('export-preview'), fileSizeInfo = document.getElementById('file-size-info'),
-cropInfo = document.getElementById('crop-info');
+cropInfo = document.getElementById('crop-info'), toolMoveBtn = document.getElementById('tool-move'),
+toolCropBtn = document.getElementById('tool-crop'), toolTextBtn = document.getElementById('tool-text');
+function updateStaticUIText() {
+openBtn.textContent = lang.open;
+exportBtn.textContent = lang.export;
+pasteBtn.textContent = lang.paste;
+document.getElementById('width-label').textContent = lang.width;
+document.getElementById('height-label').textContent = lang.height;
+document.getElementById('keep-proportions-label').title = lang.keepAspectRatio;
+resizeBtn.textContent = lang.resize;
+zoomOutBtn.title = lang.zoomOut;
+fitToScreenBtn.title = lang.fitToScreen;
+zoomInBtn.title = lang.zoomIn;
+applyCropBtn.textContent = lang.applyCrop;
+document.getElementById('text-input').placeholder = lang.textInputPlaceholder;
+addTextBtn.textContent = lang.addText;
+document.getElementById('shadow-label').textContent = lang.shadow;
+toolMoveBtn.title = lang.toolMove;
+toolCropBtn.title = lang.toolCrop;
+toolTextBtn.title = lang.toolText;
+document.getElementById('layers-title').textContent = lang.layers;
+layerUpBtn.title = lang.moveUp;
+layerDownBtn.title = lang.moveDown;
+layerDeleteBtn.title = lang.delete;
+document.getElementById('export-title').textContent = lang.exportTitle;
+document.getElementById('format-label').textContent = lang.format;
+document.getElementById('quality-label').textContent = lang.quality;
+exportPreview.alt = lang.previewAlt;
+}
 const getHandles = (rect) => {
 const { x, y, w, h } = rect;
 return {
@@ -501,7 +560,7 @@ const reversedIndex = layers.length - 1 - index;
 const li = document.createElement('li'); li.textContent = `${layer.name}`; li.dataset.index = reversedIndex;
 if (reversedIndex === activeLayerIndex) li.classList.add('active');
 const visibilityToggle = document.createElement('span'); visibilityToggle.className = 'visibility-toggle';
-visibilityToggle.innerHTML = layer.visible ? '👁️' : '🙈'; visibilityToggle.title = "Show/hide layer";
+visibilityToggle.innerHTML = layer.visible ? '👁️' : '🙈'; visibilityToggle.title = lang.showHideLayer;
 visibilityToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleLayerVisibility(reversedIndex); });
 li.prepend(visibilityToggle); li.addEventListener('click', () => setActiveLayer(reversedIndex));
 layersList.appendChild(li);
@@ -552,13 +611,13 @@ if (blob) {
 if (exportPreview.src) URL.revokeObjectURL(exportPreview.src);
 const url = URL.createObjectURL(blob);
 exportPreview.src = url;
-fileSizeInfo.textContent = `Størrelse: ${(blob.size / 1024).toFixed(2)} KB`;
+fileSizeInfo.textContent = `${lang.fileSize} ${(blob.size / 1024).toFixed(2)} KB`;
 }
 }, format, quality);
 };
 const applyCrop = () => {
 if (Math.abs(cropRect.w) < 1 || Math.abs(cropRect.h) < 1) return;
-if (!confirm('Cropping will merge all layers into one. Do you want to continue?')) return;
+if (!confirm(lang.cropConfirm)) return;
 const normCrop = getNormalizedRect(cropRect);
 const newWidth = Math.round(normCrop.w), newHeight = Math.round(normCrop.h);
 const flattenedCanvas = createFlattenedCanvas();
@@ -570,7 +629,7 @@ currentAspectRatio = newWidth / newHeight;
 resizeWidthInput.value = newWidth; resizeHeightInput.value = newHeight;
 const newImg = new Image();
 newImg.onload = () => {
-layers = [{ type: 'image', name: 'Cropped image', content: newImg, x: 0, y: 0, width: newWidth, height: newHeight, visible: true }];
+layers = [{ type: 'image', name: lang.croppedImage, content: newImg, x: 0, y: 0, width: newWidth, height: newHeight, visible: true }];
 setActiveLayer(0); switchTool('move'); fitToScreen();
 };
 newImg.src = tempCanvas.toDataURL();
@@ -579,7 +638,7 @@ const pasteFromClipboard = async () => {
 try {
 const permission = await navigator.permissions.query({ name: 'clipboard-read' });
 if (permission.state === 'denied') {
-throw new Error('Clipboard access denied.');
+throw new Error(lang.clipboardDenied);
 }
 const clipboardItems = await navigator.clipboard.read();
 for (const item of clipboardItems) {
@@ -589,7 +648,7 @@ const blob = await item.getType(imageType);
 const img = new Image();
 img.onload = () => {
 addLayer({
-type: 'image', name: 'Pasted image', content: img,
+type: 'image', name: lang.pastedImage, content: img,
 x: 0, y: 0, width: img.width, height: img.height, visible: true
 }, true);
 URL.revokeObjectURL(img.src);
@@ -598,10 +657,10 @@ img.src = URL.createObjectURL(blob);
 return;
 }
 }
-alert('No image found on clipboard.');
+alert(lang.noImageOnClipboard);
 } catch (err) {
 console.error('Could not paste from clipboard:', err);
-alert('Could not paste. Check console for error message.');
+alert(lang.pasteError);
 }
 };
 const loadImage = (img, fileName) => {
@@ -613,9 +672,9 @@ setActiveLayer(0);
 fitToScreen();
 updateExportPreview();
 };
-document.getElementById('tool-move').addEventListener('click', () => switchTool('move'));
-document.getElementById('tool-crop').addEventListener('click', () => switchTool('crop'));
-document.getElementById('tool-text').addEventListener('click', () => switchTool('text'));
+toolMoveBtn.addEventListener('click', () => switchTool('move'));
+toolCropBtn.addEventListener('click', () => switchTool('crop'));
+toolTextBtn.addEventListener('click', () => switchTool('text'));
 openBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', (e) => {
 const file = e.target.files[0]; if (!file) return;
@@ -756,9 +815,24 @@ const dH = newH - height;
 newX -= dW / 2;
 newY -= dH / 2;
 }
+if (layer.type === 'text') {
+const scaleFactor = newW / originalLayerState.width;
+const newFontSize = originalLayerState.fontSize * scaleFactor;
+if (newFontSize >= 5) {
+layer.fontSize = newFontSize;
+ctx.font = `${layer.fontSize}px ${layer.font}`;
+const metrics = ctx.measureText(layer.content);
+layer.width = metrics.width;
+layer.height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+layer.x = newX;
+layer.y = newY;
+}
+} else {
 if (newW > 10) { layer.x = newX; layer.width = newW; }
 if (newH > 10) { layer.y = newY; layer.height = newH; }
-redrawCanvas(); return;
+}
+redrawCanvas();
+return;
 }
 if (isResizingCrop) {
 const dx = pos.x - startX;
@@ -877,8 +951,8 @@ activeHandle = null;
 resizeBtn.addEventListener('click', () => {
 const newWidth = parseInt(resizeWidthInput.value, 10);
 const newHeight = parseInt(resizeHeightInput.value, 10);
-if (isNaN(newWidth) || isNaN(newHeight) || newWidth <= 0 || newHeight <= 0) { return alert('Invalid width/height.'); }
-if (!confirm('Resizing will merge all layers into one. Do you want to continue?')) return;
+if (isNaN(newWidth) || isNaN(newHeight) || newWidth <= 0 || newHeight <= 0) { return alert(lang.invalidSize); }
+if (!confirm(lang.resizeConfirm)) return;
 currentAspectRatio = newWidth / newHeight;
 const flattenedCanvas = createFlattenedCanvas();
 const tempCanvas = document.createElement('canvas'); tempCanvas.width = newWidth; tempCanvas.height = newHeight;
@@ -888,7 +962,7 @@ tempCtx.drawImage(flattenedCanvas, 0, 0, logicalWidth, logicalHeight, 0, 0, newW
 logicalWidth = newWidth; logicalHeight = newHeight;
 const img = new Image();
 img.onload = () => {
-layers = [{ type: 'image', name: 'Resized image', content: img, x: 0, y: 0, width: newWidth, height: newHeight, visible: true }];
+layers = [{ type: 'image', name: lang.resizedImage, content: img, x: 0, y: 0, width: newWidth, height: newHeight, visible: true }];
 setActiveLayer(0); fitToScreen();
 };
 img.src = tempCanvas.toDataURL();
@@ -900,7 +974,7 @@ fontSize = parseInt(document.getElementById('font-size').value, 10), shadow = do
 ctx.font = `${fontSize}px ${font}`;
 const metrics = ctx.measureText(text);
 const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-addLayer({ type: 'text', name: `Text: "${text.substring(0, 10)}..."`, content: text, x: 0, y: 0, width: metrics.width, height: height, color, font, fontSize, shadow, visible: true }, true);
+addLayer({ type: 'text', name: `${lang.textLayer} "${text.substring(0, 10)}..."`, content: text, x: 0, y: 0, width: metrics.width, height: height, color, font, fontSize, shadow, visible: true }, true);
 switchTool('move');
 });
 applyCropBtn.addEventListener('click', applyCrop);
@@ -919,12 +993,13 @@ link.href = flattenedCanvas.toDataURL(exportFormatSelect.value, parseFloat(expor
 link.click();
 });
 const init = () => {
+updateStaticUIText();
 resizeWidthInput.value = logicalWidth; resizeHeightInput.value = logicalHeight;
 const bgCanvas = document.createElement('canvas');
 bgCanvas.width = logicalWidth; bgCanvas.height = logicalHeight;
 bgCanvas.getContext('2d').fillStyle = 'white';
 bgCanvas.getContext('2d').fillRect(0, 0, logicalWidth, logicalHeight);
-addLayer({ type: 'image', name: 'Background', content: bgCanvas, x: 0, y: 0, width: logicalWidth, height: logicalHeight, visible: true });
+addLayer({ type: 'image', name: lang.backgroundLayer, content: bgCanvas, x: 0, y: 0, width: logicalWidth, height: logicalHeight, visible: true });
 updateCanvasSize();
 fitToScreen();
 switchTool('move');
@@ -933,5 +1008,6 @@ window.addEventListener('resize', () => { updateCanvasSize(); fitToScreen(); });
 init();
 });
 </script>
+<script src="/stats/tracker.js" defer></script>
 </body>
 </html>
