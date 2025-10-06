@@ -884,7 +884,7 @@
         drawAllLayers(ctx);
 
         // Draw selection handles for the active layer
-        if (state.activeLayerIndex !== -1 && state.layers[state.activeLayerIndex] ? .visible && state.currentTool === CONSTANTS.TOOLS.MOVE) {
+        if (state.activeLayerIndex !== -1 && state.layers[state.activeLayerIndex] ?.visible && state.currentTool === CONSTANTS.TOOLS.MOVE) {
           const layer = state.layers[state.activeLayerIndex];
           ctx.strokeStyle = 'rgba(0, 122, 204, 0.8)';
           ctx.lineWidth = 2 / state.zoom;
