@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale-1.0">
   <title>Image Editor</title>
   <style>
     :root {
@@ -775,12 +775,6 @@
           if (layer.adjustments.invert !== 0) filters.push(`invert(${layer.adjustments.invert}%)`);
           if (layer.adjustments.blur > 0) filters.push(`blur(${layer.adjustments.blur}px)`);
 
-          // =================================================================
-          // ✅ BUG FIX 1: Correctly apply filters using a snapshot
-          // A canvas context cannot use its own canvas as a source image.
-          // We create a snapshot, apply the filter to the context, then draw
-          // the snapshot back onto the canvas.
-          // =================================================================
           if (filters.length > 0) {
             // Create a copy because a context cannot draw its own canvas as a source
             const snapshot = document.createElement('canvas');
@@ -1178,18 +1172,14 @@
           x: originalLayer.x + 10,
           y: originalLayer.y + 10,
         };
-
-        // =================================================================
-        // ✅ BUG FIX 2: Handle both Image and Canvas layer content
-        // The original code only worked for `Image` elements, failing on
-        // the initial background layer which uses a `Canvas` element.
-        // =================================================================
+        
         if (originalLayer.type === 'image') {
           newContent = new Image();
           newContent.onload = () => {
             newLayer.content = newContent;
             addLayer(newLayer);
           };
+          // Handle both Image and Canvas elements as layer content
           if (originalLayer.content instanceof HTMLImageElement) {
             newContent.src = originalLayer.content.src;
           } else if (originalLayer.content instanceof HTMLCanvasElement) {
@@ -1216,7 +1206,8 @@
       // SECTION: Tool & UI Actions
       // =================================================================================
       const switchTool = (tool) => {
-        document.querySelector('.tool-btn.active') ? .classList.remove('active');
+        // ✅ BUG FIX 3: Removed space in `?.` (optional chaining operator)
+        document.querySelector('.tool-btn.active')?.classList.remove('active');
         document.getElementById(`tool-${tool}`).classList.add('active');
         state.currentTool = tool;
 
