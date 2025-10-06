@@ -746,12 +746,11 @@
             willReadFrequently: true
           });
 
-          tempCtx.save();
-
           // Draw layer content (image or text)
           if (layer.type === 'image') {
             tempCtx.drawImage(layer.content, 0, 0, layer.width, layer.height);
           } else if (layer.type === 'text') {
+            tempCtx.save();
             tempCtx.font = `${layer.fontSize}px ${layer.font}`;
             tempCtx.fillStyle = layer.color;
             if (layer.shadow) {
@@ -762,8 +761,8 @@
             }
             tempCtx.textBaseline = 'top';
             tempCtx.fillText(layer.content, 0, 0);
+            tempCtx.restore();
           }
-          tempCtx.restore();
 
           // Apply non-destructive CSS-like filters
           const filters = [];
@@ -776,18 +775,24 @@
           if (layer.adjustments.invert !== 0) filters.push(`invert(${layer.adjustments.invert}%)`);
           if (layer.adjustments.blur > 0) filters.push(`blur(${layer.adjustments.blur}px)`);
 
+          // =================================================================
+          // ✅ BUG FIX 1: Correctly apply filters using a snapshot
+          // A canvas context cannot use its own canvas as a source image.
+          // We create a snapshot, apply the filter to the context, then draw
+          // the snapshot back onto the canvas.
+          // =================================================================
           if (filters.length > 0) {
-            tempCtx.filter = filters.join(' ');
-            tempCtx.drawImage(tempCanvas, 0, 0); // Re-draw with filter
-            tempCtx.filter = 'none'; // Reset filter
-          }
+            // Create a copy because a context cannot draw its own canvas as a source
+            const snapshot = document.createElement('canvas');
+            snapshot.width = tempCanvas.width;
+            snapshot.height = tempCanvas.height;
+            snapshot.getContext('2d').drawImage(tempCanvas, 0, 0);
 
-          // Apply destructive convolution filters if they were triggered
-          if (layer.filterApplied) {
-            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-            if (layer.filterApplied === 'sharpen') applyConvolutionFilter(imageData, 'sharpen');
-            if (layer.filterApplied === 'emboss') applyConvolutionFilter(imageData, 'emboss');
-            tempCtx.putImageData(imageData, 0, 0);
+            // Apply filter and draw from the snapshot back to the temp canvas
+            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.filter = filters.join(' ');
+            tempCtx.drawImage(snapshot, 0, 0);
+            tempCtx.filter = 'none'; // Reset filter for subsequent operations
           }
 
           // Draw the processed layer onto the main canvas
@@ -798,7 +803,6 @@
           // Reset context for the next layer
           targetCtx.globalAlpha = 1.0;
           targetCtx.globalCompositeOperation = 'source-over';
-          tempCanvas.width = tempCanvas.height = 0; // Help GC
         });
       };
 
@@ -836,7 +840,9 @@
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const dstOff = (y * width + x) * 4;
-            let r = 0, g = 0, b = 0;
+            let r = 0,
+              g = 0,
+              b = 0;
 
             for (let cy = 0; cy < side; cy++) {
               for (let cx = 0; cx < side; cx++) {
@@ -1173,14 +1179,24 @@
           y: originalLayer.y + 10,
         };
 
+        // =================================================================
+        // ✅ BUG FIX 2: Handle both Image and Canvas layer content
+        // The original code only worked for `Image` elements, failing on
+        // the initial background layer which uses a `Canvas` element.
+        // =================================================================
         if (originalLayer.type === 'image') {
           newContent = new Image();
-          newContent.src = originalLayer.content.src;
           newContent.onload = () => {
             newLayer.content = newContent;
             addLayer(newLayer);
           };
+          if (originalLayer.content instanceof HTMLImageElement) {
+            newContent.src = originalLayer.content.src;
+          } else if (originalLayer.content instanceof HTMLCanvasElement) {
+            newContent.src = originalLayer.content.toDataURL();
+          }
         } else if (originalLayer.type === 'text') {
+          // Text layers are just data and can be duplicated directly
           addLayer(newLayer);
         }
       };
@@ -1437,7 +1453,7 @@
           layers: state.layers.map(layer => {
             const layerCopy = { ...layer
             };
-            if (layerCopy.type === 'image' && layerCopy.content instanceof Image) {
+            if (layerCopy.type === 'image' && (layerCopy.content instanceof Image || layerCopy.content instanceof HTMLCanvasElement)) {
               const tempCanvas = document.createElement('canvas');
               tempCanvas.width = layerCopy.width;
               tempCanvas.height = layerCopy.height;
@@ -2077,8 +2093,10 @@
             layer.opacity = parseFloat(DOM.layerOpacitySlider.value);
             DOM.layerOpacityValue.textContent = `${Math.round(layer.opacity * 100)}%`;
             redrawCanvas();
-            updateExportPreview();
           }
+        });
+        DOM.layerOpacitySlider.addEventListener('change', () => {
+          if (state.layers[state.activeLayerIndex]) updateExportPreview();
         });
         DOM.layerBlendModeSelect.addEventListener('change', () => {
           const layer = state.layers[state.activeLayerIndex];
@@ -2129,19 +2147,25 @@
               layer.adjustments[item.key] = parseFloat(item.id.value);
               item.display.textContent = `${item.id.value}${item.suffix || ''}`;
               redrawCanvas();
-              updateExportPreview();
             }
           });
+          item.id.addEventListener('change', () => {
+            if (state.layers[state.activeLayerIndex]) updateExportPreview();
+          });
         });
+
         DOM.filterBlur.addEventListener('input', () => {
           const layer = state.layers[state.activeLayerIndex];
           if (layer && layer.type === 'image') {
             layer.adjustments.blur = parseFloat(DOM.filterBlur.value);
             DOM.blurValue.textContent = layer.adjustments.blur;
             redrawCanvas();
-            updateExportPreview();
           }
         });
+        DOM.filterBlur.addEventListener('change', () => {
+          if (state.layers[state.activeLayerIndex]) updateExportPreview();
+        });
+
 
         const applyPermanentFilter = (filterType) => {
           const layer = state.layers[state.activeLayerIndex];
